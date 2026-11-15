@@ -1,0 +1,244 @@
+{
+  "candidate": "Rakshita Dhanapal: L2 Application / Production Support Analyst, ~2 years of experience. SQL/Oracle SQL, incident & SLA management, REST/B2B API troubleshooting, log analysis, AWS Linux, JIRA, Grafana. B.E. AI & ML (2024), learning GenAI/LLMs/RAG. Based in Bengaluru, wants Pune.",
+  "locations": {
+    "priority": [
+      "pune"
+    ],
+    "also_ok": [
+      "bengaluru",
+      "bangalore",
+      "remote - india",
+      "india - remote",
+      "remote, india"
+    ]
+  },
+  "title_include": [
+    "application support",
+    "app support",
+    "applications support",
+    "production support",
+    "prod support",
+    "support analyst",
+    "support engineer",
+    "support specialist",
+    "technical support",
+    "l2 support",
+    "l2",
+    "incident",
+    "problem management",
+    "itsm",
+    "service management",
+    "site reliability",
+    "sre",
+    "monitoring",
+    "operations analyst",
+    "it operations",
+    "run & maintain",
+    "systems support",
+    "sql support",
+    "integration support",
+    "platform support",
+    "product support",
+    "customer support engineer"
+  ],
+  "title_exclude": [
+    "manager",
+    "director",
+    "principal",
+    "head of",
+    "vice president",
+    "vp",
+    "staff",
+    "architect",
+    "lead",
+    "sales",
+    "intern",
+    "voice",
+    "chat process",
+    "bpo",
+    "telecaller",
+    "field",
+    "hardware",
+    "desktop support",
+    "senior manager",
+    "avp",
+    "frontline",
+    "senior sre",
+    "sr. sre",
+    "sr sre",
+    "incident responder",
+    "clinical",
+    "administrative",
+    "assistant",
+    "fraud",
+    "collections",
+    "renewals",
+    "hr ops",
+    "ta operation",
+    "banking support"
+  ],
+  "search_queries": [
+    "support",
+    "incident",
+    "site reliability"
+  ],
+  "max_age_days": 10,
+  "max_alerts_per_run": 20,
+  "sources": {
+    "workday": {
+      "enabled": true,
+      "companies": [
+        {
+          "name": "Citi",
+          "host": "citi.wd5",
+          "tenant": "citi",
+          "site": "2"
+        },
+        {
+          "name": "Barclays",
+          "host": "barclays.wd3",
+          "tenant": "barclays",
+          "site": "External_Career_Site_Barclays"
+        },
+        {
+          "name": "Mastercard",
+          "host": "mastercard.wd1",
+          "tenant": "mastercard",
+          "site": "CorporateCareers"
+        },
+        {
+          "name": "Deutsche Bank",
+          "host": "db.wd3",
+          "tenant": "db",
+          "site": "DBWebsite"
+        },
+        {
+          "name": "NVIDIA",
+          "host": "nvidia.wd5",
+          "tenant": "nvidia",
+          "site": "NVIDIAExternalCareerSite"
+        },
+        {
+          "name": "FIS",
+          "host": "fis.wd5",
+          "tenant": "fis",
+          "site": "SearchJobs"
+        },
+        {
+          "name": "Fiserv",
+          "host": "fiserv.wd5",
+          "tenant": "fiserv",
+          "site": "EXT"
+        },
+        {
+          "name": "Qualys",
+          "host": "qualys.wd5",
+          "tenant": "qualys",
+          "site": "Careers"
+        },
+        {
+          "name": "Accenture",
+          "host": "accenture.wd103",
+          "tenant": "accenture",
+          "site": "AccentureCareers"
+        },
+        {
+          "name": "Wolters Kluwer",
+          "host": "wk.wd3",
+          "tenant": "wk",
+          "site": "External"
+        },
+        {
+          "name": "Equifax",
+          "host": "equifax.wd5",
+          "tenant": "equifax",
+          "site": "External"
+        },
+        {
+          "name": "Hitachi",
+          "host": "hitachi.wd1",
+          "tenant": "hitachi",
+          "site": "hitachi"
+        },
+        {
+          "name": "Philips",
+          "host": "philips.wd3",
+          "tenant": "philips",
+          "site": "jobs-and-careers"
+        },
+        {
+          "name": "Ecolab",
+          "host": "ecolab.wd1",
+          "tenant": "ecolab",
+          "site": "Ecolab_External"
+        },
+        {
+          "name": "Zendesk",
+          "host": "zendesk.wd1",
+          "tenant": "zendesk",
+          "site": "zendesk"
+        },
+        {
+          "name": "Workday",
+          "host": "workday.wd5",
+          "tenant": "workday",
+          "site": "Workday"
+        },
+        {
+          "name": "Medtronic",
+          "host": "medtronic.wd1",
+          "tenant": "medtronic",
+          "site": "MedtronicCareers"
+        },
+        {
+          "name": "Red Hat",
+          "host": "redhat.wd5",
+          "tenant": "redhat",
+          "site": "jobs"
+        }
+      ],
+      "cities": [
+        "Pune",
+        "Bengaluru"
+      ]
+    },
+    "greenhouse": {
+      "enabled": true,
+      "boards": [
+        "pubmatic",
+        "druva",
+        "rubrik",
+        "sumologic",
+        "newrelic",
+        "razorpaysoftwareprivatelimited",
+        "groww",
+        "inmobi",
+        "okta"
+      ]
+    },
+    "lever": {
+      "enabled": true,
+      "companies": [
+        "mindtickle",
+        "hevodata",
+        "paytm",
+        "meesho",
+        "cred",
+        "zeta",
+        "fampay"
+      ]
+    },
+    "smartrecruiters": {
+      "enabled": true,
+      "companies": [
+        "BoschGroup",
+        "Sutherland"
+      ],
+      "cities": [
+        "Pune",
+        "Bengaluru",
+        "Bangalore"
+      ]
+    }
+  }
+}

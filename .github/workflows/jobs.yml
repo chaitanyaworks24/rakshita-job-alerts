@@ -1,0 +1,48 @@
+name: Watch for jobs
+
+on:
+  schedule:
+    - cron: "15 */5 * * *"   # every 5 hours = ~155 free GitHub minutes/month (budget shared with other watchers)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: job-watcher
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check career portals and send alerts
+        run: python job_watcher.py
+
+      - name: Save seen jobs
+        run: |
+          git config user.name "job-watcher"
+          git config user.email "job-watcher@users.noreply.github.com"
+          git add seen.json health.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update seen jobs and health"
+            git push
+          fi
+
+      - name: Tell Telegram if this run crashed
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=🚨 Job watcher run crashed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            > /dev/null
