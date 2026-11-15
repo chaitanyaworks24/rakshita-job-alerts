@@ -350,7 +350,7 @@ def run(dry_run):
             send_errors.append("%s: %s" % (j["title"][:60], e))
         time.sleep(1)
     if len(fresh) > len(to_send):
-        note = "…and %d more matching jobs this round (lower priority, not sent)." % (len(fresh) - len(to_send))
+        note = "…and %d more matching jobs. They'll come in the next check." % (len(fresh) - len(to_send))
         print(note) if dry_run else send_telegram(note)
 
     problems = update_health(health, results, len(to_send) - len(send_errors), now)
@@ -361,7 +361,7 @@ def run(dry_run):
         print(msg) if dry_run else send_telegram(msg, admin=True)
 
     if not dry_run:
-        for j in fresh:
+        for j in to_send:  # jobs over the per-run limit stay unseen, so they're sent next check
             seen[j["key"]] = now.isoformat()
         cutoff = (now - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
         with open(SEEN_PATH, "w") as f:
