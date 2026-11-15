@@ -19,6 +19,7 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +44,6 @@ jobs:
         if: failure()
         run: |
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=🚨 Job watcher run crashed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --data-urlencode "chat_id=${TELEGRAM_ADMIN_CHAT_ID:-$TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=🚨 Rakshita's job watcher run crashed. Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             > /dev/null

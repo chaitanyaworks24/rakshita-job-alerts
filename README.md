@@ -16,9 +16,14 @@ To add a company, add it to `config.json` (Workday companies need host/tenant/si
 ## Alerts
 
 - 💼 One message per new matching job, Pune first
+Rakshita gets only the 💼 job alerts. Problem reports go to the maintainer's chat (`TELEGRAM_ADMIN_CHAT_ID`, which is Chaitanya):
+
 - 📊 A daily check-in each morning (if it stops arriving, the watcher has stopped)
-- ⚠️ A warning if a source fails 2 checks in a row, and ✅ when it recovers
+- ⚠️ A warning if a whole source **or a single company** (e.g. Citi blocking us) fails 2 checks in a row, and ✅ when it recovers
+- ⚠️ A warning if some job alerts couldn't be delivered (the rest still go out; badly formatted ones are resent as plain text)
 - 🚨 A crash alert with a link to the logs
+
+If Telegram itself is unreachable or the bot token is revoked, the bot can't send anything, so GitHub emails the repo owner about the failed run instead.
 
 ## Run locally
 

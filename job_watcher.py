@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -30,6 +31,7 @@ HEALTH_PATH = os.path.join(HERE, "health.json")
 USER_AGENT = "Mozilla/5.0 (Macintosh) job-watcher/1.0"
 SEEN_RETENTION_DAYS = 60
 FAIL_ALERT_AFTER = 2  # consecutive failed checks (~10 hours) before warning on Telegram
+PARTIAL_ERRORS = {}  # "source/company" -> error, filled by fetchers when one company or board fails
 
 
 # ---------- helpers ----------
@@ -124,6 +126,7 @@ def fetch_workday(cfg, config, now):
                 jobs.extend(f.result())
             except Exception as e:
                 errors[futures[f]] = str(e)
+                PARTIAL_ERRORS["workday/" + futures[f]] = str(e)
     if errors:
         log("workday errors: %s" % errors)
     if errors and len(errors) == len(cfg["companies"]):
@@ -138,6 +141,7 @@ def fetch_greenhouse(cfg, config, now):
             data = http_json("https://boards-api.greenhouse.io/v1/boards/%s/jobs" % board)
         except Exception as e:
             log("greenhouse %s failed: %s" % (board, e))
+            PARTIAL_ERRORS["greenhouse/" + board] = str(e)
             continue
         for j in data.get("jobs", []):
             jobs.append(job("greenhouse", board, j["id"], j["title"], j["absolute_url"],
@@ -153,6 +157,7 @@ def fetch_lever(cfg, config, now):
             data = http_json("https://api.lever.co/v0/postings/%s?mode=json" % company)
         except Exception as e:
             log("lever %s failed: %s" % (company, e))
+            PARTIAL_ERRORS["lever/" + company] = str(e)
             continue
         for j in data:
             cats = j.get("categories") or {}
@@ -172,6 +177,7 @@ def fetch_smartrecruiters(cfg, config, now):
                                  % (company, city))
             except Exception as e:
                 log("smartrecruiters %s/%s failed: %s" % (company, city, e))
+                PARTIAL_ERRORS["smartrecruiters/" + company] = str(e)
                 continue
             for j in data.get("content", []):
                 loc = j.get("location") or {}
@@ -230,12 +236,20 @@ def telegram(method, payload):
         return json.loads(resp.read())
 
 
-def send_telegram(text):
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+def send_telegram(text, admin=False):
+    """admin=True sends to TELEGRAM_ADMIN_CHAT_ID (whoever maintains the watcher), if set."""
+    chat_id = (admin and os.environ.get("TELEGRAM_ADMIN_CHAT_ID")) or os.environ.get("TELEGRAM_CHAT_ID")
     if not chat_id:
         raise SystemExit("TELEGRAM_CHAT_ID is not set (run: python3 job_watcher.py --get-chat-id)")
-    telegram("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
-                             "disable_web_page_preview": True})
+    try:
+        telegram("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                                 "disable_web_page_preview": True})
+    except urllib.error.HTTPError as e:
+        if e.code != 400:
+            raise
+        # Telegram rejected the formatting: resend as plain text so the message still arrives
+        plain = html.unescape(re.sub(r"<[^>]+>", "", text))
+        telegram("sendMessage", {"chat_id": chat_id, "text": plain, "disable_web_page_preview": True})
 
 
 def format_job(j):
@@ -266,14 +280,14 @@ def update_health(health, results, sent_count, now):
         h = health["sources"].setdefault(name, {"fail_streak": 0, "alerted": False})
         if error is None:
             if h["alerted"]:
-                messages.append("✅ Job source <b>%s</b> is working again." % name)
+                messages.append("✅ Rakshita's job watcher: <b>%s</b> is working again." % name)
             h.update(fail_streak=0, alerted=False, last_ok=now.isoformat(), last_error=None)
             continue
         h["fail_streak"] += 1
         h["last_error"] = error[:300]
         if h["fail_streak"] >= FAIL_ALERT_AFTER and not h["alerted"]:
             h["alerted"] = True
-            messages.append("⚠️ Job source <b>%s</b> has failed %d checks in a row.\nError: <code>%s</code>"
+            messages.append("⚠️ Rakshita's job watcher: <b>%s</b> has failed %d checks in a row.\nError: <code>%s</code>"
                             % (name, h["fail_streak"], html.escape(error[:200], quote=False)))
 
     day = health.setdefault("day", {})
@@ -281,7 +295,7 @@ def update_health(health, results, sent_count, now):
     if day.get("date") != today:
         if day.get("date"):
             broken = [n for n, h in health["sources"].items() if h["fail_streak"]]
-            messages.append("📊 <b>Daily job check-in (%s)</b>\n%d checks ran, %d new jobs sent.\nSources: %s"
+            messages.append("📊 <b>Rakshita's job watcher, daily check-in (%s)</b>\n%d checks ran, %d new jobs sent.\nSources: %s"
                             % (day["date"], day.get("runs", 0), day.get("sent", 0),
                                "all working ✅" if not broken else "problems with " + ", ".join(broken) + " ⚠️"))
         day.clear()
@@ -313,24 +327,38 @@ def run(dry_run):
             log("%-16s FAILED: %s" % (name, e))
             results[name] = "%s: %s" % (type(e).__name__, e)
 
+    for key, error in PARTIAL_ERRORS.items():
+        results[key] = error
+    for key in health["sources"]:  # companies that failed before and worked this time
+        if "/" in key and key not in results and results.get(key.split("/")[0]) is None:
+            results[key] = None
+
     matched = filter_jobs(all_jobs, config)
     fresh = [j for j in matched if j["key"] not in seen and (j["posted"] is None or now - j["posted"] <= max_age)]
     fresh.sort(key=lambda j: (j["tier"], -(j["posted"] or now - max_age).timestamp()))
     log("%d matching roles, %d new" % (len(matched), len(fresh)))
 
     to_send = fresh[:config.get("max_alerts_per_run", 20)]
+    send_errors = []
     for j in to_send:
         if dry_run:
             print(format_job(j) + "\n" + "-" * 40)
-        else:
+            continue
+        try:
             send_telegram(format_job(j))
-            time.sleep(1)
+        except Exception as e:  # one bad message shouldn't stop the rest
+            send_errors.append("%s: %s" % (j["title"][:60], e))
+        time.sleep(1)
     if len(fresh) > len(to_send):
         note = "…and %d more matching jobs this round (lower priority, not sent)." % (len(fresh) - len(to_send))
         print(note) if dry_run else send_telegram(note)
 
-    for msg in update_health(health, results, len(to_send), now):
-        print(msg) if dry_run else send_telegram(msg)
+    problems = update_health(health, results, len(to_send) - len(send_errors), now)
+    if send_errors:
+        problems.append("⚠️ Rakshita's job watcher: %d job alerts failed to send.\n<code>%s</code>"
+                        % (len(send_errors), html.escape("\n".join(send_errors)[:500], quote=False)))
+    for msg in problems:
+        print(msg) if dry_run else send_telegram(msg, admin=True)
 
     if not dry_run:
         for j in fresh:
