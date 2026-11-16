@@ -232,8 +232,27 @@ def telegram(method, payload):
     req = urllib.request.Request(
         "https://api.telegram.org/bot%s/%s" % (token, method),
         data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 3:  # rate limited: wait as long as Telegram asks
+                try:
+                    wait = json.loads(e.read()).get("parameters", {}).get("retry_after", 5)
+                except ValueError:
+                    wait = 5
+                log("telegram rate limit, waiting %ss" % wait)
+                time.sleep(min(wait, 60) + 1)
+            elif e.code >= 500 and attempt < 3:
+                time.sleep(3 * (attempt + 1))
+            else:
+                raise
+        except (urllib.error.URLError, OSError) as e:  # timeouts, connection resets
+            if attempt == 3:
+                raise
+            log("telegram %s failed (%s), retrying" % (method, e))
+            time.sleep(3 * (attempt + 1))
 
 
 def send_telegram(text, admin=False):
@@ -339,7 +358,7 @@ def run(dry_run):
     log("%d matching roles, %d new" % (len(matched), len(fresh)))
 
     to_send = fresh[:config.get("max_alerts_per_run", 20)]
-    send_errors = []
+    send_errors, failed_keys = [], set()
     for j in to_send:
         if dry_run:
             print(format_job(j) + "\n" + "-" * 40)
@@ -348,6 +367,8 @@ def run(dry_run):
             send_telegram(format_job(j))
         except Exception as e:  # one bad message shouldn't stop the rest
             send_errors.append("%s: %s" % (j["title"][:60], e))
+            failed_keys.add(j["key"])
+            log("failed to send %r: %s" % (j["title"], e))
         time.sleep(1)
     if len(fresh) > len(to_send):
         note = "…and %d more matching jobs. They'll come in the next check." % (len(fresh) - len(to_send))
@@ -355,20 +376,21 @@ def run(dry_run):
 
     problems = update_health(health, results, len(to_send) - len(send_errors), now)
     if send_errors:
-        problems.append("⚠️ Rakshita's job watcher: %d job alerts failed to send.\n<code>%s</code>"
+        problems.append("⚠️ Rakshita's job watcher: %d job alerts failed to send (will retry next check).\n<code>%s</code>"
                         % (len(send_errors), html.escape("\n".join(send_errors)[:500], quote=False)))
     for msg in problems:
         print(msg) if dry_run else send_telegram(msg, admin=True)
 
     if not dry_run:
-        for j in to_send:  # jobs over the per-run limit stay unseen, so they're sent next check
-            seen[j["key"]] = now.isoformat()
+        for j in to_send:  # unsent jobs (over the limit or failed to send) stay unseen, so they're retried next check
+            if j["key"] not in failed_keys:
+                seen[j["key"]] = now.isoformat()
         cutoff = (now - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
         with open(SEEN_PATH, "w") as f:
             json.dump({k: v for k, v in seen.items() if v >= cutoff}, f, indent=0, sort_keys=True)
         with open(HEALTH_PATH, "w") as f:
             json.dump(health, f, indent=1, sort_keys=True)
-    log("sent %d job alerts%s" % (len(to_send), " (dry run)" if dry_run else ""))
+    log("sent %d job alerts%s" % (len(to_send) - len(send_errors), " (dry run)" if dry_run else ""))
 
 
 def main():
