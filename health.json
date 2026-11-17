@@ -1,33 +1,33 @@
 {
  "day": {
   "date": "2026-11-17",
-  "runs": 1,
-  "sent": 1
+  "runs": 2,
+  "sent": 2
  },
  "sources": {
   "greenhouse": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-17T07:58:24.908695+00:00"
+   "last_ok": "2026-11-17T19:12:08.618513+00:00"
   },
   "lever": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-17T07:58:24.908695+00:00"
+   "last_ok": "2026-11-17T19:12:08.618513+00:00"
   },
   "smartrecruiters": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-17T07:58:24.908695+00:00"
+   "last_ok": "2026-11-17T19:12:08.618513+00:00"
   },
   "workday": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-17T07:58:24.908695+00:00"
+   "last_ok": "2026-11-17T19:12:08.618513+00:00"
   }
  }
 }
