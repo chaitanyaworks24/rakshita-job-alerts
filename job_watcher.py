@@ -21,6 +21,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -53,19 +54,45 @@ def log(msg):
     print(msg, file=sys.stderr)
 
 
-def http_json(url, body=None, retries=2):
+def http_get(url, body=None, retries=2, headers=None):
     last_err = None
     for attempt in range(retries + 1):
         try:
             req = urllib.request.Request(
                 url, data=json.dumps(body).encode() if body is not None else None,
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json", "Content-Type": "application/json"})
+                headers={"User-Agent": USER_AGENT, "Accept": "application/json", "Content-Type": "application/json",
+                         **(headers or {})})
             with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
+                return resp.read()
         except Exception as e:
             last_err = e
             time.sleep(2 * (attempt + 1))
     raise last_err
+
+
+def http_json(url, body=None, retries=2, headers=None):
+    return json.loads(http_get(url, body, retries, headers))
+
+
+def parse_date(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)) or str(value).isdigit():
+        ts = float(value)
+        return datetime.fromtimestamp(ts / 1000 if ts > 1e11 else ts, timezone.utc)
+    value = str(value).strip()
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
 
 
 def parse_iso(value):
@@ -90,11 +117,89 @@ def parse_workday_posted(text, now):
 
 
 def job(source, company, job_id, title, url, location, posted):
-    return {"key": "%s:%s:%s" % (source, company, job_id), "source": source, "company": company,
-            "title": title.strip(), "url": url, "location": (location or "").strip(), "posted": posted}
+    return {"key": "%s:%s:%s" % (source, company, job_id), "source": source, "company": (company or "").strip(),
+            "title": html.unescape(title or "").strip(), "url": url, "location": (location or "").strip(),
+            "posted": posted}
 
 
 # ---------- sources ----------
+
+# ---------- Indian job boards ----------
+
+def fetch_gladiator(source, host, cfg):
+    """iimjobs and Hirist run on the same backend ("gladiator") with a JSON search API."""
+    jobs = []
+    for q in cfg["queries"]:
+        for page in range(1, cfg.get("max_pages", 3) + 1):
+            time.sleep(cfg.get("delay_seconds", 10))  # both sites ask for Crawl-delay: 10 in robots.txt
+            url = "https://%s/job/search?%s" % (host, urllib.parse.urlencode(
+                {"query": q, "page": page, "posting": cfg.get("posted_within_days", 3)}))
+            try:
+                data = http_json(url, headers={"version": "2"})
+            except Exception as e:
+                log("%s %r failed: %s" % (source, q, e))
+                PARTIAL_ERRORS["%s/%s" % (source, q)] = str(e)
+                break
+            for j in data.get("data", []):
+                location = "; ".join(l.get("name", "") for l in j.get("locations") or [])
+                if j.get("workFromHome"):
+                    location = "Remote, India; " + location
+                # jobdesignation is the title without the "Company - " prefix iimjobs adds
+                jobs.append(job(source, (j.get("companyData") or {}).get("companyName"), j["id"],
+                                j.get("jobdesignation") or j.get("title"), j.get("jobDetailUrl"), location,
+                                parse_date(j.get("createdTimeMs") or j.get("createdTime"))))
+            if not data.get("hasMore"):
+                break
+    return jobs
+
+
+def fetch_jobspy(site):
+    """LinkedIn, Naukri, Indeed and Glassdoor via the JobSpy library (pip install python-jobspy; Python 3.10+)."""
+    def fetch(cfg, config, now):
+        try:
+            from jobspy import scrape_jobs
+        except ImportError:
+            raise RuntimeError("python-jobspy is not installed (needs Python 3.10+: pip install -r requirements.txt)")
+        jobs, failed = [], []
+        for location in cfg["locations"]:
+            for q in cfg["queries"]:
+                try:
+                    df = scrape_jobs(site_name=[site], search_term=q, location=location, country_indeed="india",
+                                     results_wanted=cfg.get("results_wanted", 30),
+                                     hours_old=cfg.get("hours_old", 24), verbose=0)
+                except Exception as e:
+                    log("%s %r in %s failed: %s" % (site, q, location, e))
+                    failed.append("%s in %s: %s" % (q, location, e))
+                    continue
+                for r in df.to_dict("records"):
+                    r = {k: (None if v != v else v) for k, v in r.items()}  # pandas uses NaN for missing values
+                    place = str(r.get("location") or "")
+                    city = location.split(",")[0]
+                    if city.lower() != "india" and city.lower() not in place.lower():
+                        place = "%s; %s" % (city, place)  # Indeed only gives the state ("KA, India")
+                    if r.get("is_remote"):
+                        place = "Remote, India" + ("" if place.lower() in ("", "india") else "; " + place)
+                    jobs.append(job(site, r.get("company"), r.get("id") or r.get("job_url"), r.get("title"),
+                                    r.get("job_url"), place, parse_date(str(r["date_posted"])) if r.get("date_posted") else None))
+                time.sleep(cfg.get("delay_seconds", 3))
+        total = len(cfg["locations"]) * len(cfg["queries"])
+        if len(failed) == total:
+            raise RuntimeError("every %s search failed: %s" % (site, failed[0]))
+        if failed:  # LinkedIn often rate-limits a few searches from GitHub: only warn when they all fail (above)
+            log("%s: %d of %d searches failed" % (site, len(failed), total))
+        return jobs
+    return fetch
+
+
+def fetch_iimjobs(cfg, config, now):
+    return fetch_gladiator("iimjobs", "gladiator.iimjobs.com", cfg)
+
+
+def fetch_hirist(cfg, config, now):
+    return fetch_gladiator("hirist", "gladiator.hirist.tech", cfg)
+
+
+# ---------- company career portals ----------
 
 def fetch_workday(cfg, config, now):
     def base(c):
@@ -193,6 +298,12 @@ SOURCES = {
     "greenhouse": fetch_greenhouse,
     "lever": fetch_lever,
     "smartrecruiters": fetch_smartrecruiters,
+    "iimjobs": fetch_iimjobs,
+    "hirist": fetch_hirist,
+    "linkedin": fetch_jobspy("linkedin"),
+    "naukri": fetch_jobspy("naukri"),
+    "indeed": fetch_jobspy("indeed"),
+    "glassdoor": fetch_jobspy("glassdoor"),
 }
 
 
@@ -200,6 +311,14 @@ SOURCES = {
 
 def term_pattern(term):
     return re.compile(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(term.lower()))
+
+
+def fingerprint(j):
+    """Same company + title = same job, whichever board it came from (LinkedIn, Naukri, Indeed... overlap a lot)."""
+    def norm(s):
+        return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+    company = re.sub(r"\b(private|pvt|limited|ltd|inc|llp|technologies|india)\b", "", norm(j["company"]))
+    return "dup:%s|%s" % (" ".join(company.split()), norm(j["title"]))
 
 
 def filter_jobs(jobs, config):
@@ -219,7 +338,8 @@ def filter_jobs(jobs, config):
             j["tier"] = 1
         else:
             continue
-        kept[j["key"]] = j  # dedupe: Workday returns the same job for several queries
+        j["fp"] = fingerprint(j)
+        kept.setdefault(j["fp"], j)  # dedupe: same job from several queries or several boards
     return list(kept.values())
 
 
@@ -271,14 +391,33 @@ def send_telegram(text, admin=False):
         telegram("sendMessage", {"chat_id": chat_id, "text": plain, "disable_web_page_preview": True})
 
 
+def link_messages(links, limit=4000):
+    """All apply links as bare URLs, one per line, split to fit Telegram's 4096-character limit."""
+    chunks, current = [], ""
+    for url in links:
+        if current and len(current) + 1 + len(url) > limit:
+            chunks.append(current)
+            current = ""
+        current = current + "\n" + url if current else url
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def send_links(text):
+    # Plain text (no parse_mode) so the full URLs show as-is, ready to copy and forward
+    telegram("sendMessage", {"chat_id": os.environ.get("TELEGRAM_CHAT_ID"), "text": text,
+                             "disable_web_page_preview": True})
+
+
 def format_job(j):
     def e(s):
         return html.escape(s, quote=False)
     badge = "📍 Pune" if j["tier"] == 0 else "📍 " + j["location"]
-    lines = ["💼 <b>%s</b>" % e(j["title"]), "🏢 %s" % e(j["company"]), e(badge)]
+    lines = ["💼 <b>%s</b>" % e(j["title"]), "🏢 %s" % e(j["company"] or "?"), e(badge)]
     if j.get("posted"):
         lines.append("🕒 Posted %s" % j["posted"].strftime("%d %b"))
-    lines.append('\n<a href="%s">View &amp; apply →</a>' % html.escape(j["url"], quote=True))
+    lines.append('\n<a href="%s">View &amp; apply →</a>' % html.escape(j["url"] or "", quote=True))
     return "\n".join(lines)
 
 
@@ -334,17 +473,19 @@ def run(dry_run):
     max_age = timedelta(days=config.get("max_age_days", 10))
 
     all_jobs, results = [], {}
-    for name, cfg in config["sources"].items():
-        if not cfg.get("enabled"):
-            continue
-        try:
-            found = SOURCES[name](cfg, config, now)
-            log("%-16s %d postings" % (name, len(found)))
-            all_jobs.extend(found)
-            results[name] = None if found else "returned no postings (possibly blocked or changed)"
-        except Exception as e:
-            log("%-16s FAILED: %s" % (name, e))
-            results[name] = "%s: %s" % (type(e).__name__, e)
+    enabled = [(n, c) for n, c in config["sources"].items() if c.get("enabled")]
+    with concurrent.futures.ThreadPoolExecutor(len(enabled)) as pool:
+        futures = {pool.submit(SOURCES[n], c, config, now): n for n, c in enabled}
+        for f in concurrent.futures.as_completed(futures):
+            name = futures[f]
+            try:
+                found = f.result()
+                log("%-16s %d postings" % (name, len(found)))
+                all_jobs.extend(found)
+                results[name] = None if found else "returned no postings (possibly blocked or changed)"
+            except Exception as e:
+                log("%-16s FAILED: %s" % (name, e))
+                results[name] = "%s: %s" % (type(e).__name__, e)
 
     for key, error in PARTIAL_ERRORS.items():
         results[key] = error
@@ -353,7 +494,8 @@ def run(dry_run):
             results[key] = None
 
     matched = filter_jobs(all_jobs, config)
-    fresh = [j for j in matched if j["key"] not in seen and (j["posted"] is None or now - j["posted"] <= max_age)]
+    fresh = [j for j in matched if j["key"] not in seen and j["fp"] not in seen
+             and (j["posted"] is None or now - j["posted"] <= max_age)]
     fresh.sort(key=lambda j: (j["tier"], -(j["posted"] or now - max_age).timestamp()))
     log("%d matching roles, %d new" % (len(matched), len(fresh)))
 
@@ -373,6 +515,13 @@ def run(dry_run):
     if len(fresh) > len(to_send):
         note = "…and %d more matching jobs. They'll come in the next check." % (len(fresh) - len(to_send))
         print(note) if dry_run else send_telegram(note)
+    links = [j["url"] for j in to_send if j["key"] not in failed_keys and j["url"]]
+    for chunk in link_messages(links):
+        try:
+            print(chunk) if dry_run else send_links(chunk)
+        except Exception as e:  # the jobs already went out: don't lose seen.json over this
+            send_errors.append("apply links message: %s" % e)
+            log("failed to send apply links: %s" % e)
 
     problems = update_health(health, results, len(to_send) - len(send_errors), now)
     if send_errors:
@@ -384,7 +533,7 @@ def run(dry_run):
     if not dry_run:
         for j in to_send:  # unsent jobs (over the limit or failed to send) stay unseen, so they're retried next check
             if j["key"] not in failed_keys:
-                seen[j["key"]] = now.isoformat()
+                seen[j["key"]] = seen[j["fp"]] = now.isoformat()
         cutoff = (now - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
         with open(SEEN_PATH, "w") as f:
             json.dump({k: v for k, v in seen.items() if v >= cutoff}, f, indent=0, sort_keys=True)

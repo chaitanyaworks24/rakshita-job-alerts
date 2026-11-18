@@ -83,8 +83,89 @@
     "site reliability"
   ],
   "max_age_days": 10,
-  "max_alerts_per_run": 20,
+  "max_alerts_per_run": 50,
   "sources": {
+    "linkedin": {
+      "enabled": true,
+      "hours_old": 24,
+      "results_wanted": 50,
+      "delay_seconds": 8,
+      "locations": [
+        "Pune",
+        "Bengaluru"
+      ],
+      "queries": [
+        "application support",
+        "production support"
+      ],
+      "note": "LinkedIn rate-limits after ~4-5 searches per run from GitHub"
+    },
+    "naukri": {
+      "enabled": true,
+      "hours_old": 24,
+      "results_wanted": 50,
+      "locations": [
+        "India"
+      ],
+      "queries": [
+        "application support",
+        "production support",
+        "support analyst",
+        "l2 support",
+        "site reliability engineer"
+      ]
+    },
+    "indeed": {
+      "enabled": true,
+      "hours_old": 24,
+      "results_wanted": 30,
+      "locations": [
+        "Pune",
+        "Bengaluru"
+      ],
+      "queries": [
+        "application support",
+        "production support",
+        "support analyst"
+      ]
+    },
+    "hirist": {
+      "enabled": true,
+      "posted_within_days": 15,
+      "max_pages": 2,
+      "delay_seconds": 10,
+      "queries": [
+        "support engineer",
+        "site reliability"
+      ],
+      "note": "narrower searches like 'application support' are hidden from logged-out visitors"
+    },
+    "iimjobs": {
+      "enabled": false,
+      "posted_within_days": 3,
+      "max_pages": 2,
+      "delay_seconds": 10,
+      "queries": [
+        "application support",
+        "production support"
+      ],
+      "note": "management job board: almost no support roles, and it hides those from logged-out users"
+    },
+    "glassdoor": {
+      "enabled": false,
+      "note": "blocks GitHub servers (403); works from a home connection",
+      "hours_old": 24,
+      "results_wanted": 30,
+      "locations": [
+        "Pune",
+        "Bengaluru"
+      ],
+      "queries": [
+        "application support",
+        "production support",
+        "support analyst"
+      ]
+    },
     "workday": {
       "enabled": true,
       "companies": [

@@ -2,7 +2,7 @@ name: Watch for jobs
 
 on:
   schedule:
-    - cron: "15 */5 * * *"   # every 5 hours = ~155 free GitHub minutes/month (budget shared with other watchers)
+    - cron: "15 */2 * * *"   # every 2 hours (public repo, so Actions minutes are free)
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+
+      - name: Install JobSpy (LinkedIn, Naukri, Indeed, Glassdoor)
+        run: pip install -r requirements.txt
 
       - name: Check career portals and send alerts
         run: python job_watcher.py
@@ -35,10 +39,16 @@ jobs:
           git config user.name "job-watcher"
           git config user.email "job-watcher@users.noreply.github.com"
           git add seen.json health.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Update seen jobs and health"
-            git push
+          if git diff --cached --quiet; then
+            exit 0
           fi
+          git commit -m "Update seen jobs and health"
+          # Someone may have pushed while this run was checking jobs: pick up their commits, then push
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet && git push --quiet && exit 0
+            sleep 5
+          done
+          exit 1
 
       - name: Tell Telegram if this run crashed
         if: failure()
