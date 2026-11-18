@@ -1,7 +1,7 @@
 {
  "day": {
   "date": "2026-11-18",
-  "runs": 1,
+  "runs": 2,
   "sent": 0
  },
  "sources": {
@@ -9,25 +9,25 @@
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T02:27:13.450117+00:00"
+   "last_ok": "2026-11-18T14:03:53.944714+00:00"
   },
   "lever": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T02:27:13.450117+00:00"
+   "last_ok": "2026-11-18T14:03:53.944714+00:00"
   },
   "smartrecruiters": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T02:27:13.450117+00:00"
+   "last_ok": "2026-11-18T14:03:53.944714+00:00"
   },
   "workday": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T02:27:13.450117+00:00"
+   "last_ok": "2026-11-18T14:03:53.944714+00:00"
   }
  }
 }
