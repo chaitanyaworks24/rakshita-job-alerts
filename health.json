@@ -1,57 +1,57 @@
 {
  "day": {
-  "date": "2026-11-18",
-  "runs": 4,
-  "sent": 65
+  "date": "2026-11-19",
+  "runs": 1,
+  "sent": 21
  },
  "sources": {
   "greenhouse": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "hirist": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "indeed": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "lever": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "linkedin": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "naukri": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "smartrecruiters": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   },
   "workday": {
    "alerted": false,
    "fail_streak": 0,
    "last_error": null,
-   "last_ok": "2026-11-18T21:44:59.225850+00:00"
+   "last_ok": "2026-11-19T03:35:19.187194+00:00"
   }
  }
 }
